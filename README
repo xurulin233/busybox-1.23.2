@@ -1,0 +1,85 @@
+##mini_busybox制作
+tar -jxvf busybox-1.23.2.tar.bz2
+cd busybox-1.23.2/
+busybox的构建流程
+1.make menuconfig -->裁剪定制构建选项:make defconfig
+ncurses库的支持:
+sudo apt-get install libncurses*
+aptitude search libncurses
+
+==========================================================================================================
+2.make-->根据选项编译出二进制文件
+根据选项安装busybox3.make install --->
+busybox的交叉编译
+1.确认使用的交叉编译工具链以及其安装位置which arm-linux-gcc配置busybox的编译工具链参数
+Build options--->
+()Cross Compiler prefix
+()Path to sysroot
+/home/s5pv210/test0108/opt/FriendlyARM/toolschain/4.5.1/bin/arm-linux-
+/home/s5pv210/test0108/opt/FriendlyARM/toolschain/4.5.1/arm-none-linux-gnueabi/sys-root
+
+
+==================================================================================================================
+busybox的裁剪定制
+可配置选项简介:busyboxsettings通用配置
+ General Configuration 
+	[]Don't use /usr
+构建选项:静态库、交叉编译
+make 
+make install
+mkdir ../mini_busybox
+cp ./_install/* ../mini_busybox/ -arf
+
+================================================================================================================
+补全目录结构
+cd  ../mini_busybox
+mkdir proc lib etc dev var
+
+添加动态库
+mini_busybox$ readelf -d bin/busybox  |grep EEDED 
+ 0x00000001 (NEEDED)                     Shared library: [libm.so.6]
+ 0x00000001 (NEEDED)                     Shared library: [libc.so.6]
+ 
+cd /home/s5pv210/test0108/opt/FriendlyARM/toolschain/4.5.1/arm-none-linux-gnueabi/sys-root/lib/
+cp ld-linux.so.3  libm.so.6 libc.so.6 /home/s5pv210/test1219/mini_busybox/lib
+
+
+创建设备文件
+cd /home/s5pv210/test1219/mini_busybox/dev
+sudo mknod console c 5 1
+ls -lh /dev/tty[1-3]
+sudo mknod tty1 c 4 1
+sudo mknod tty2 c 4 2
+sudo mknod tty3 c 4 3
+
+添加配置文件
+cp ../../busybox-1.23.2/examples/bootfloppy/etc/* ../etc/ -arf
+ 
+========================================================================================================================
+
+##ubuntu 搭建nfs服务器
+sudo apt-get install nfs-kernel-server  # 安装 NFS服务器端
+sudo apt-get install nfs-common         # 安装 NFS客户端
+
+sudo vim /etc/exports
+在该文件末尾添加下面的一行
+/home/s5pv210/test1219/mini_busybox *(rw,sync,no_root_squash)     # * 表示允许任何网段 IP 的系统访问该 NFS 目录
+
+
+/*
+sudo mkdir /nfsroot
+sudo chmod -R 777 /nfsroot
+sudo chown ipual:ipual /nfsroot/ -R   # ipual 为当前用户，-R 表示递归更改该目录下所有文件
+*/
+
+
+sudo /etc/init.d/nfs-kernel-server start    或者  
+sudo /etc/init.d/nfs-kernel-server restart
+
+===============================================================================================================================
+
+##linux内核启动参数设置nfs路径
+cd linux-3.0.8
+cp mini210_linux_defconfig .config
+CONFIG_CMDLINE="root=/dev/nfs nfsroot=192.168.70.185:/home/s5pv210/test1219/mini_busybox ip=192.168.70.183:192.168.70.185:192.168.70.252:255.255.255.0::eth0:off init=/linuxrc console=tty1 console=ttySAC0 androidboot.console=ttySAC0 lcd=S70"
+make ARCH=arm CROSS_COMPILE=/home/s5pv210/test0108/opt/FriendlyARM/toolschain/4.5.1/bin/arm-none-linux-gnueabi- zImage uImage
